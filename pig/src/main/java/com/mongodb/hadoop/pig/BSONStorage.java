@@ -18,6 +18,7 @@ package com.mongodb.hadoop.pig;
 
 import org.bson.*;
 import org.bson.types.*;
+import org.bson.types.ObjectId;
 import com.mongodb.*;
 import com.mongodb.hadoop.*;
 import com.mongodb.hadoop.output.*;
@@ -35,6 +36,7 @@ import org.apache.pig.ResourceSchema.ResourceFieldSchema;
 import java.io.*;
 import java.text.ParseException;
 import java.util.*;
+import java.text.SimpleDateFormat;
 
 public class BSONStorage extends StoreFunc implements StoreMetadata {
     
@@ -84,7 +86,7 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
         if(dataType == DataType.BYTEARRAY && o instanceof Map){
             dataType = DataType.MAP;
         }
-    
+
         switch (dataType) {
             case DataType.NULL:
                 return null;
@@ -96,8 +98,22 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
             case DataType.BYTEARRAY:
                 return o.toString();
             case DataType.CHARARRAY:
-                return (String)o;
-        
+                String carray = (String)o;
+                if(carray!=null && carray.startsWith("ISODate(") && carray.endsWith(")")){
+                    String b = carray.substring(8, carray.indexOf(")"));
+                    SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
+                    sdf.setTimeZone(TimeZone.getTimeZone("GMT+0:00"));
+                    try {
+                        return sdf.parse(b);
+                    } catch (ParseException e) {
+                        e.printStackTrace();
+                    }
+                }
+                else if(carray!=null && carray.startsWith("ObjectId(") && carray.endsWith(")")){
+                    String b = carray.substring(9, carray.indexOf(")"));
+                    return new ObjectId(b);
+                }
+                return carray;
             //Given a TUPLE, create a Map so BSONEncoder will eat it
             case DataType.TUPLE:
                 if (s == null) {
@@ -108,7 +124,7 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
                 ResourceSchema.ResourceFieldSchema[] fs = s.getFields();
                 LinkedHashMap m = new java.util.LinkedHashMap();
                 for (int j = 0; j < fs.length; j++) {
-                    m.put(fs[j].getName(), getTypeForBSON(((Tuple) o).get(j), fs[j], toIgnore)); 
+                    m.put(fs[j].getName(), getTypeForBSON(((Tuple) o).get(j), fs[j], toIgnore));
                 }
                 return m;
                 
@@ -147,7 +163,7 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
                     for (Tuple t : (DataBag)o) {
                         LinkedHashMap ma = new java.util.LinkedHashMap();
                         for (int j = 0; j < fs.length; j++) {
-                            ma.put(fs[j].getName(), t.get(j));
+                            ma.put(fs[j].getName(), getTypeForBSON(t.get(j), fs[j], toIgnore));
                         }
                         a.add(ma);
                     }

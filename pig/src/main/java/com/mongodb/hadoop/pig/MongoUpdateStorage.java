@@ -144,7 +144,7 @@ public class MongoUpdateStorage extends StoreFunc implements StoreMetadata {
                 isUpsert = (mu.containsField("upsert") ? mu.getBoolean("upsert") : isUpsert);
                 isMulti = (mu.containsField("multi") ? mu.getBoolean("multi") : isMulti);
             }
-            
+
             _recordWriter.write(null, new MongoUpdateWritable(q,u, 
                                                               isUpsert,
                                                               isMulti));
@@ -155,7 +155,7 @@ public class MongoUpdateStorage extends StoreFunc implements StoreMetadata {
     }
     
     @Override
-    public void prepareToWrite(RecordWriter writer) throws IOException{     
+    public void prepareToWrite(RecordWriter writer) throws IOException{    
         _recordWriter = (MongoRecordWriter<?, MongoUpdateWritable>) writer;
         log.info( "Preparing to write to " + _recordWriter );
         if ( _recordWriter == null )

@@ -118,9 +118,12 @@ public class BSONLoader extends LoadFunc {
 			return null;
 		
 		try {
-			if(field == null)
+			if(field == null){
+                if(obj instanceof BasicDBList){
+                    return obj.toString();
+                }
 				return obj;
-
+            }
     		switch (field.getType()) {
     		case DataType.INTEGER:
     			return Integer.parseInt(obj.toString());

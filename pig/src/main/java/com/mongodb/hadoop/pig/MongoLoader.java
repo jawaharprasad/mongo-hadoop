@@ -120,7 +120,11 @@ public class MongoLoader extends LoadFunc implements LoadMetadata {
                 if(this.idAlias != null && this.idAlias.equals(fieldTemp)){
                     fieldTemp = "_id";
                 }
-                t.set(i, BSONLoader.readField(val.get(fieldTemp), fields[i]));
+                if (fields[i].getName().startsWith(MongoStorage.ESC_UNDERSCORE_PREFIX)) {
+				   t.set(i, BSONLoader.readField(val.get(fieldTemp.substring(MongoStorage.ESC_UNDERSCORE_PREFIX.length() - 1)), fields[i]));
+				} else {
+				   t.set(i, BSONLoader.readField(val.get(fieldTemp), fields[i]));
+				}
             }
         }
         return t;
