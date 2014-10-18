@@ -16,58 +16,36 @@
 
 package com.mongodb.hadoop.pig;
 
-<<<<<<< HEAD
-import org.bson.*;
-import org.bson.types.*;
-import org.bson.types.ObjectId;
-import com.mongodb.*;
-import com.mongodb.hadoop.*;
-import com.mongodb.hadoop.output.*;
-import com.mongodb.hadoop.util.*;
-import org.apache.commons.logging.*;
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.mapreduce.*;
-import org.apache.pig.*;
-import org.apache.pig.data.*;
-import org.apache.pig.impl.util.*;
-=======
+
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.hadoop.BSONFileOutputFormat;
+import org.apache.commons.logging.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.RecordWriter;
-import org.apache.pig.LoadFunc;
->>>>>>> d900ab824fc4bc8581527ecc28f51cd239fb8773
-import org.apache.pig.ResourceSchema;
+import org.apache.pig.*;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
-import org.apache.pig.ResourceStatistics;
-import org.apache.pig.StoreFunc;
-import org.apache.pig.StoreMetadata;
+import org.apache.pig.data.*;
 import org.apache.pig.data.DataBag;
 import org.apache.pig.data.DataType;
 import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.util.*;
 import org.apache.pig.impl.util.UDFContext;
 import org.apache.pig.impl.util.Utils;
+import org.bson.*;
+import org.bson.types.*;
+import org.bson.types.ObjectId;
 
-<<<<<<< HEAD
-
-import java.io.*;
-import java.text.ParseException;
-import java.util.*;
-import java.text.SimpleDateFormat;
-=======
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
->>>>>>> d900ab824fc4bc8581527ecc28f51cd239fb8773
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 public class BSONStorage extends StoreFunc implements StoreMetadata {
 
