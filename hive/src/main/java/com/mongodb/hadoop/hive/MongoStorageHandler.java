@@ -16,10 +16,11 @@
 
 package com.mongodb.hadoop.hive;
 
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Properties;
-
+import com.mongodb.DBCollection;
+import com.mongodb.MongoClientURI;
+import com.mongodb.hadoop.hive.input.HiveMongoInputFormat;
+import com.mongodb.hadoop.hive.output.HiveMongoOutputFormat;
+import com.mongodb.hadoop.util.MongoConfigUtil;
 import org.apache.hadoop.hive.metastore.HiveMetaHook;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.MetaException;
@@ -30,14 +31,13 @@ import org.apache.hadoop.hive.serde2.SerDe;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.OutputFormat;
 
-import com.mongodb.DBCollection;
-import com.mongodb.MongoURI;
-import com.mongodb.hadoop.util.MongoConfigUtil;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
 
-import com.mongodb.hadoop.hive.input.HiveMongoInputFormat;
-import com.mongodb.hadoop.hive.output.HiveMongoOutputFormat;
+import static java.lang.String.format;
 
-/*
+/**
  * Used to sync documents in some MongoDB collection with
  * rows in a Hive table
  */
@@ -46,101 +46,96 @@ public class MongoStorageHandler extends DefaultStorageHandler {
     public static final String MONGO_URI = "mongo.uri";
     // get location of where meta-data is stored about the mongo collection
     public static final String TABLE_LOCATION = "location";
-    
-    public MongoStorageHandler() { }
-    
+
     @Override
-    public Class<? extends InputFormat<?,?>> getInputFormatClass() {
+    public Class<? extends InputFormat<?, ?>> getInputFormatClass() {
         return HiveMongoInputFormat.class;
     }
-    
+
     @Override
     public HiveMetaHook getMetaHook() {
         return new MongoHiveMetaHook();
     }
-    
+
     @Override
-    public Class<? extends OutputFormat<?,?>> getOutputFormatClass() {
+    public Class<? extends OutputFormat<?, ?>> getOutputFormatClass() {
         return HiveMongoOutputFormat.class;
     }
-    
+
     @Override
     public Class<? extends SerDe> getSerDeClass() {
         return BSONSerDe.class;
     }
-    
-    /*
+
+    /**
      * HiveMetaHook used to define events triggered when a hive table is
      * created and when a hive table is dropped.
      */
     private class MongoHiveMetaHook implements HiveMetaHook {
         @Override
-        public void preCreateTable(Table tbl) throws MetaException {
+        public void preCreateTable(final Table tbl) throws MetaException {
             Map<String, String> tblParams = tbl.getParameters();
             if (!tblParams.containsKey(MONGO_URI)) {
-                throw new MetaException("You must specify 'mongo.uri' in TBLPROPERTIES");
+                throw new MetaException(format("You must specify '%s' in TBLPROPERTIES", MONGO_URI));
             }
-        }
-        
-        @Override
-        public void commitCreateTable(Table tbl) throws MetaException {
-        }
-        
-        @Override
-        public void rollbackCreateTable(Table tbl) throws MetaException {
-        }
-        
-        @Override
-        public void preDropTable(Table tbl) throws MetaException {
         }
 
         @Override
-        public void commitDropTable(Table tbl, boolean deleteData)
-                    throws MetaException {
+        public void commitCreateTable(final Table tbl) throws MetaException {
+        }
+
+        @Override
+        public void rollbackCreateTable(final Table tbl) throws MetaException {
+        }
+
+        @Override
+        public void preDropTable(final Table tbl) throws MetaException {
+        }
+
+        @Override
+        public void commitDropTable(final Table tbl, final boolean deleteData) throws MetaException {
             boolean isExternal = MetaStoreUtils.isExternalTable(tbl);
-            
+
             if (deleteData && !isExternal) {
                 Map<String, String> tblParams = tbl.getParameters();
                 if (tblParams.containsKey(MONGO_URI)) {
                     String mongoURIStr = tblParams.get(MONGO_URI);
-                    DBCollection coll = MongoConfigUtil.getCollection(new MongoURI(mongoURIStr));
+                    DBCollection coll = MongoConfigUtil.getCollection(new MongoClientURI(mongoURIStr));
                     coll.drop();
                 } else {
-                    throw new MetaException("No 'mongo.uri' property found. Collection not dropped.");
+                    throw new MetaException(format("No '%s' property found. Collection not dropped.", MONGO_URI));
                 }
             }
         }
-    
+
         @Override
-        public void rollbackDropTable(Table tbl) throws MetaException {
+        public void rollbackDropTable(final Table tbl) throws MetaException {
         }
     }
 
     @Override
-    public void configureInputJobProperties(TableDesc tableDesc,
-                        Map<String, String> jobProperties) {
+    public void configureInputJobProperties(final TableDesc tableDesc, final Map<String, String> jobProperties) {
         Properties properties = tableDesc.getProperties();
         copyJobProperties(properties, jobProperties);
     }
-    
+
     @Override
-    public void configureOutputJobProperties(TableDesc tableDesc,
-                         Map<String, String> jobProperties) {
+    public void configureOutputJobProperties(final TableDesc tableDesc, final Map<String, String> jobProperties) {
         Properties properties = tableDesc.getProperties();
         copyJobProperties(properties, jobProperties);
     }
-    
-    /*
+
+    /**
      * Helper function to copy properties
      */
-    private void copyJobProperties(Properties from, Map<String, String> to) {
+    private void copyJobProperties(final Properties from, final Map<String, String> to) {
         for (Entry<Object, Object> e : from.entrySet()) {
-            to.put((String)e.getKey(), (String)e.getValue());
+            to.put((String) e.getKey(), (String) e.getValue());
         }
-        
+
         if (to.containsKey(MONGO_URI)) {
             String mongoURIStr = to.get(MONGO_URI);
-            to.put(MongoConfigUtil.INPUT_URI,  mongoURIStr);
+            to.put(MongoConfigUtil.INPUT_URI, mongoURIStr);
             to.put(MongoConfigUtil.OUTPUT_URI, mongoURIStr);
         }
     }

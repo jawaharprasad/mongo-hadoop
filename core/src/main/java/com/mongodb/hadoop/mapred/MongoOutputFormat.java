@@ -16,38 +16,37 @@
 
 package com.mongodb.hadoop.mapred;
 
-import org.apache.commons.logging.*;
-import org.apache.hadoop.mapred.*;
-import org.apache.hadoop.fs.*;
-import org.apache.hadoop.util.*;
+import com.mongodb.hadoop.mapred.output.MongoOutputCommitter;
+import com.mongodb.hadoop.mapred.output.MongoRecordWriter;
+import com.mongodb.hadoop.util.MongoConfigUtil;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.OutputCommitter;
+import org.apache.hadoop.mapred.OutputFormat;
+import org.apache.hadoop.mapred.RecordWriter;
+import org.apache.hadoop.mapred.TaskAttemptContext;
+import org.apache.hadoop.util.Progressable;
 
-import com.mongodb.hadoop.mapred.output.*;
-import com.mongodb.hadoop.util.*;
-import com.mongodb.MongoURI;
-import java.util.List;
 import java.io.IOException;
 
 @SuppressWarnings("deprecation")
 public class MongoOutputFormat<K, V> implements OutputFormat<K, V> {
-    private static final Log log = LogFactory.getLog(MongoOutputFormat.class);
-
     public MongoOutputFormat() {
     }
 
-    public void checkOutputSpecs(FileSystem ignored, JobConf job) throws IOException {
-        List<MongoURI> outputUris; 
-        outputUris = MongoConfigUtil.getOutputURIs(job);
-        if(outputUris == null || outputUris.size() == 0){
+    public void checkOutputSpecs(final FileSystem ignored, final JobConf job) throws IOException {
+        if (MongoConfigUtil.getOutputURIs(job).isEmpty()) {
             throw new IOException("No output URI is specified. You must set mongo.output.uri.");
         }
     }
 
-    public OutputCommitter getOutputCommitter(TaskAttemptContext context) {
-        return new MongoOutputCommiter();
+    public OutputCommitter getOutputCommitter(final TaskAttemptContext context) {
+        return new MongoOutputCommitter();
     }
 
-    public RecordWriter<K, V> getRecordWriter(FileSystem ignored, JobConf job, String name, Progressable progress) {
-        return new MongoRecordWriter(MongoConfigUtil.getOutputCollections(job), job);
+    public RecordWriter<K, V> getRecordWriter(final FileSystem ignored, final JobConf job, final String name,
+                                              final Progressable progress) {
+        return new MongoRecordWriter<K, V>(MongoConfigUtil.getOutputCollections(job), job);
     }
 
 }

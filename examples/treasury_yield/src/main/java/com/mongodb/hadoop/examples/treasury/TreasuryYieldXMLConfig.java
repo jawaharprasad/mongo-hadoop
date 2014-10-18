@@ -15,27 +15,45 @@
  */
 package com.mongodb.hadoop.examples.treasury;
 
-// Mongo
-
-import org.bson.*;
-import com.mongodb.hadoop.util.*;
-
-// Hadoop
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.util.*;
+import com.mongodb.hadoop.MongoInputFormat;
+import com.mongodb.hadoop.MongoOutputFormat;
+import com.mongodb.hadoop.io.BSONWritable;
+import com.mongodb.hadoop.util.MapredMongoConfigUtil;
+import com.mongodb.hadoop.util.MongoConfigUtil;
+import com.mongodb.hadoop.util.MongoTool;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.util.ToolRunner;
 
 /**
  * The treasury yield xml config object.
  */
 public class TreasuryYieldXMLConfig extends MongoTool {
-
-    static{
-        Configuration.addDefaultResource( "src/examples/hadoop-local.xml" );
-        Configuration.addDefaultResource( "src/examples/mongo-defaults.xml" );
+    public TreasuryYieldXMLConfig() {
+        this(new Configuration());
     }
 
-    public static void main( final String[] pArgs ) throws Exception{
-        System.exit( ToolRunner.run( new TreasuryYieldXMLConfig(), pArgs ) );
+    public TreasuryYieldXMLConfig(final Configuration conf) {
+        setConf(conf);
+
+        if (MongoTool.isMapRedV1()) {
+            MapredMongoConfigUtil.setInputFormat(conf, com.mongodb.hadoop.mapred.MongoInputFormat.class);
+            MapredMongoConfigUtil.setOutputFormat(conf, com.mongodb.hadoop.mapred.MongoOutputFormat.class);
+        } else {
+            MongoConfigUtil.setInputFormat(conf, MongoInputFormat.class);
+            MongoConfigUtil.setOutputFormat(conf, MongoOutputFormat.class);
+        }
+        MongoConfigUtil.setMapper(conf, TreasuryYieldMapper.class);
+        MongoConfigUtil.setMapperOutputKey(conf, IntWritable.class);
+        MongoConfigUtil.setMapperOutputValue(conf, DoubleWritable.class);
+
+        MongoConfigUtil.setReducer(conf, TreasuryYieldReducer.class);
+        MongoConfigUtil.setOutputKey(conf, IntWritable.class);
+        MongoConfigUtil.setOutputValue(conf, BSONWritable.class);
+    }
+
+    public static void main(final String[] pArgs) throws Exception {
+        System.exit(ToolRunner.run(new TreasuryYieldXMLConfig(), pArgs));
     }
 }
-

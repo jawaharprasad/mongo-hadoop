@@ -15,56 +15,78 @@
  */
 package com.mongodb.hadoop.examples.treasury;
 
-// Mongo
-
-import org.bson.*;
-import com.mongodb.hadoop.util.*;
 import com.mongodb.hadoop.io.BSONWritable;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.OutputCollector;
+import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.bson.BasicBSONObject;
 
-// Commons
-import org.apache.commons.logging.*;
-
-// Hadoop
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.io.*;
-import org.apache.hadoop.mapreduce.*;
-
-// Java
-import java.io.*;
-import java.util.*;
+import java.io.IOException;
+import java.util.Iterator;
 
 /**
  * The treasury yield reducer.
  */
 public class TreasuryYieldReducer
-        extends Reducer<IntWritable, DoubleWritable, IntWritable, BSONWritable> {
+    extends Reducer<IntWritable, DoubleWritable, IntWritable, BSONWritable> 
+    implements org.apache.hadoop.mapred.Reducer<IntWritable, DoubleWritable, IntWritable, BSONWritable> {
 
-    private static final Log LOG = LogFactory.getLog( TreasuryYieldReducer.class );
+    private static final Log LOG = LogFactory.getLog(TreasuryYieldReducer.class);
 
     @Override
-    public void reduce( final IntWritable pKey,
-                        final Iterable<DoubleWritable> pValues,
-                        final Context pContext )
-            throws IOException, InterruptedException{
+    public void reduce(final IntWritable pKey, final Iterable<DoubleWritable> pValues, final Context pContext)
+        throws IOException, InterruptedException {
 
         int count = 0;
         double sum = 0;
-        for ( final DoubleWritable value : pValues ){
+        for (final DoubleWritable value : pValues) {
             sum += value.get();
             count++;
         }
 
         final double avg = sum / count;
 
-        LOG.debug( "Average 10 Year Treasury for " + pKey.get() + " was " + avg );
+        LOG.debug("Average 10 Year Treasury for " + pKey.get() + " was " + avg);
 
         BasicBSONObject output = new BasicBSONObject();
         output.put("count", count);
         output.put("avg", avg);
         output.put("sum", sum);
-        pContext.write( pKey, new BSONWritable( output ) );
+        pContext.write(pKey, new BSONWritable(output));
     }
 
+    @Override
+    public void reduce(final IntWritable key, final Iterator<DoubleWritable> values,
+                       final OutputCollector<IntWritable, BSONWritable> output,
+                       final Reporter reporter) throws IOException {
+        int count = 0;
+        double sum = 0;
+        while (values.hasNext()) {
+            sum += values.next().get();
+            count++;
+        }
 
+        final double avg = sum / count;
+
+        LOG.debug("Average 10 Year Treasury for " + key.get() + " was " + avg);
+
+        BasicBSONObject bsonObject = new BasicBSONObject();
+        bsonObject.put("count", count);
+        bsonObject.put("avg", avg);
+        bsonObject.put("sum", sum);
+        output.collect(key, new BSONWritable(bsonObject));
+    }
+
+    @Override
+    public void close() throws IOException {
+    }
+
+    @Override
+    public void configure(final JobConf job) {
+    }
 }
-

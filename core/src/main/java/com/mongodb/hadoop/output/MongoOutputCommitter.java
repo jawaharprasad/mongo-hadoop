@@ -16,35 +16,34 @@
 
 package com.mongodb.hadoop.output;
 
-import org.apache.hadoop.mapreduce.*;
-import org.apache.commons.logging.*;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.OutputCommitter;
+import org.apache.hadoop.mapreduce.TaskAttemptContext;
 
 public class MongoOutputCommitter extends OutputCommitter {
 
-    private static final Log log = LogFactory.getLog( MongoOutputCommitter.class );
+    private static final Log LOG = LogFactory.getLog(MongoOutputCommitter.class);
 
-    public void abortTask( TaskAttemptContext taskContext ){
-        log.info("Aborting task.");
+    public void abortTask(final TaskAttemptContext taskContext) {
+        LOG.info("Aborting task.");
     }
 
-    public void cleanupJob( JobContext jobContext ){
-        log.info("Cleaning up job.");
+    public void commitTask(final TaskAttemptContext taskContext) {
+        LOG.info("Committing task.");
     }
 
-    public void commitTask( TaskAttemptContext taskContext ){
-        log.info("Committing task.");
-    }
-
-    public boolean needsTaskCommit( TaskAttemptContext taskContext ){
+    public boolean needsTaskCommit(final TaskAttemptContext taskContext) {
         return true;
     }
 
-    public void setupJob( JobContext jobContext ){
-        log.info("Setting up job.");
+    public void setupJob(final JobContext jobContext) {
+        LOG.info("Setting up job.");
     }
 
-    public void setupTask( TaskAttemptContext taskContext ){
-        log.info("Setting up task.");
+    public void setupTask(final TaskAttemptContext taskContext) {
+        LOG.info("Setting up task.");
     }
 
 }

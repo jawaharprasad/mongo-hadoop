@@ -15,57 +15,33 @@
  */
 package com.mongodb.hadoop.examples.treasury;
 
-import java.util.*;
-// Mongo
-
-import org.bson.*;
-import com.mongodb.*;
-import com.mongodb.hadoop.util.*;
-import com.mongodb.hadoop.splitter.MultiMongoCollectionSplitter;
+import com.mongodb.BasicDBObject;
+import com.mongodb.MongoClientURI;
 import com.mongodb.hadoop.splitter.MultiCollectionSplitBuilder;
+import com.mongodb.hadoop.splitter.MultiMongoCollectionSplitter;
+import com.mongodb.hadoop.util.MongoTool;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.util.ToolRunner;
 
-// Hadoop
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.util.*;
+import java.util.Date;
 
 /**
  * The treasury yield xml config object.
  */
 public class TreasuryYieldMulti extends MongoTool {
-
-    static{
-        // Load the XML config defined in hadoop-local.xml
-        Configuration.addDefaultResource( "src/examples/hadoop-local.xml" );
-        Configuration.addDefaultResource( "src/examples/mongo-defaults.xml" );
-    }
-
-    public static void main( final String[] pArgs ) throws Exception{
-        TreasuryYieldMulti tym = new TreasuryYieldMulti();
-
+    public static void main(final String[] pArgs) throws Exception {
         //Here is an example of how to use multiple collections as the input to
         //a hadoop job, from within Java code directly.
-        MultiCollectionSplitBuilder mcsb = new MultiCollectionSplitBuilder();
-        mcsb.add(new MongoURI("mongodb://localhost:27017/mongo_hadoop.yield_historical.in"),
-                 (MongoURI)null, // authuri
-                 true, // notimeout
-                 (DBObject)null, // fields
-                 (DBObject)null, // sort
-                 (DBObject)null, // query
-                 false,
-                 MultiMongoCollectionSplitter.class)
-            .add(new MongoURI("mongodb://localhost:27017/mongo_hadoop.yield_historical.in"),
-                 (MongoURI)null, // authuri
-                 true, // notimeout
-                 (DBObject)null, // fields
-                 (DBObject)null, // sort
-                 new BasicDBObject("_id", new BasicDBObject("$gt", new Date(883440000000L))),
-                 false, // range query
-                 MultiMongoCollectionSplitter.class);
+        MultiCollectionSplitBuilder builder = new MultiCollectionSplitBuilder();
+        builder.add(new MongoClientURI("mongodb://localhost:27017/mongo_hadoop.yield_historical.in"), null, true, null, null, null, false,
+                    null)
+               .add(new MongoClientURI("mongodb://localhost:27017/mongo_hadoop.yield_historical.in"), null, true, null, null,
+                    new BasicDBObject("_id", new BasicDBObject("$gt", new Date(883440000000L))), false, null);
 
         Configuration conf = new Configuration();
-        conf.set(MultiMongoCollectionSplitter.MULTI_COLLECTION_CONF_KEY, mcsb.toJSON());
+        conf.set(MultiMongoCollectionSplitter.MULTI_COLLECTION_CONF_KEY, builder.toJSON());
 
-        System.exit( ToolRunner.run(conf, new TreasuryYieldXMLConfig(), pArgs ) );
+        System.exit(ToolRunner.run(conf, new TreasuryYieldXMLConfig(conf), pArgs));
     }
 }
 

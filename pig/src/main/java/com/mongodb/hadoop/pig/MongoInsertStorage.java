@@ -17,113 +17,123 @@
 
 package com.mongodb.hadoop.pig;
 
-import org.bson.*;
-import org.bson.types.*;
-import com.mongodb.*;
-import com.mongodb.hadoop.*;
-import com.mongodb.hadoop.output.*;
-import com.mongodb.hadoop.util.*;
-import org.apache.commons.logging.*;
-import org.apache.hadoop.conf.*;
-import org.apache.hadoop.mapreduce.*;
-import org.apache.pig.*;
-import org.apache.pig.data.*;
-import org.apache.pig.impl.util.*;
+import com.mongodb.BasicDBObjectBuilder;
+import com.mongodb.hadoop.MongoOutputFormat;
+import com.mongodb.hadoop.util.MongoConfigUtil;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.OutputFormat;
+import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.pig.ResourceSchema;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
+import org.apache.pig.ResourceStatistics;
+import org.apache.pig.StoreFunc;
+import org.apache.pig.StoreMetadata;
+import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.util.UDFContext;
+import org.apache.pig.impl.util.Utils;
 
+import java.io.IOException;
+import java.util.Properties;
 
-import java.io.*;
-import java.text.ParseException;
-import java.util.*;
-
+@SuppressWarnings("unchecked")
 public class MongoInsertStorage extends StoreFunc implements StoreMetadata {
 
-    private static final Log log = LogFactory.getLog( MongoStorage.class );
+    private static final Log LOG = LogFactory.getLog(MongoStorage.class);
     // Pig specific settings
     static final String SCHEMA_SIGNATURE = "mongoinsert.pig.output.schema";
+    //CHECKSTYLE:OFF
     protected ResourceSchema schema = null;
+    //CHECKSTYLE:ON
     private RecordWriter out;
 
     private String udfcSignature = null;
     private String idField = null;
-    private boolean useUpsert = false; 
 
     private final MongoOutputFormat outputFormat = new MongoOutputFormat();
 
-    public MongoInsertStorage(){ 
+    public MongoInsertStorage() {
     }
 
-    public MongoInsertStorage(String idField, String useUpsert){ 
+    /**
+     * @deprecated useUpsert is unused.  use {@link #MongoInsertStorage(String)} instead
+     */
+    @Deprecated
+    @SuppressWarnings("UnusedParameters")
+    public MongoInsertStorage(final String idField, final String useUpsert) {
         this.idField = idField;
-        this.useUpsert = useUpsert == null ? false : useUpsert.toLowerCase().trim().equals("true");
+    }
+    
+    public MongoInsertStorage(final String idField) {
+        this.idField = idField;
     }
 
-    protected void writeField(BasicDBObjectBuilder builder,
-                            ResourceSchema.ResourceFieldSchema field,
-                            Object d) throws IOException {
+    protected void writeField(final BasicDBObjectBuilder builder,
+                              final ResourceFieldSchema field,
+                              final Object d) throws IOException {
         Object convertedType = BSONStorage.getTypeForBSON(d, field, null);
-        if(field.getName() != null && field.getName().equals(this.idField)){
+        if (field.getName() != null && field.getName().equals(idField)) {
             builder.add("_id", convertedType);
-            return;
         } else {
             builder.add(field.getName(), convertedType);
         }
-        
+
     }
-    
+
     @Override
-    public void checkSchema( ResourceSchema schema ) throws IOException{
+    public void checkSchema(final ResourceSchema schema) throws IOException {
         this.schema = schema;
         UDFContext udfc = UDFContext.getUDFContext();
 
-        Properties p = udfc.getUDFProperties(this.getClass(), new String[]{udfcSignature});
+        Properties p = udfc.getUDFProperties(getClass(), new String[]{udfcSignature});
         p.setProperty(SCHEMA_SIGNATURE, schema.toString());
     }
 
     @Override
-    public void storeSchema( ResourceSchema schema, String location, Job job ){
+    public void storeSchema(final ResourceSchema schema, final String location, final Job job) {
         // not implemented
     }
 
     @Override
-    public void storeStatistics( ResourceStatistics stats, String location, Job job ){
+    public void storeStatistics(final ResourceStatistics stats, final String location, final Job job) {
         // not implemented
     }
 
     @Override
-    public void putNext( Tuple tuple ) throws IOException{
-        try{
+    public void putNext(final Tuple tuple) throws IOException {
+        try {
             final BasicDBObjectBuilder builder = BasicDBObjectBuilder.start();
             ResourceFieldSchema[] fields = null;
-            if(this.schema != null){
-                fields = this.schema.getFields();
+            if (schema != null) {
+                fields = schema.getFields();
             }
-            if(fields != null){
+            if (fields != null) {
                 for (int i = 0; i < fields.length; i++) {
                     writeField(builder, fields[i], tuple.get(i));
                 }
-            }else{
+            } else {
                 for (int i = 0; i < tuple.size(); i++) {
                     writeField(builder, null, tuple.get(i));
                 }
             }
 
-            BSONObject bsonformat = builder.get();
-            this.out.write(null, bsonformat);
-        }catch(Exception e){
-            e.printStackTrace();
-            throw new IOException("Couldn't convert tuple to bson: " , e);
+            out.write(null, builder.get());
+        } catch (Exception e) {
+            throw new IOException("Couldn't convert tuple to bson: ", e);
         }
     }
 
-    public void prepareToWrite( RecordWriter writer ) throws IOException{
-        this.out = writer;
-        if ( this.out == null )
-            throw new IOException( "Invalid Record Writer" );
+    public void prepareToWrite(final RecordWriter writer) throws IOException {
+        out = writer;
+        if (out == null) {
+            throw new IOException("Invalid Record Writer");
+        }
 
         UDFContext udfc = UDFContext.getUDFContext();
-        Properties p = udfc.getUDFProperties(this.getClass(), new String[]{udfcSignature});
+        Properties p = udfc.getUDFProperties(getClass(), new String[]{udfcSignature});
         String strSchema = p.getProperty(SCHEMA_SIGNATURE);
         if (strSchema == null) {
             throw new IOException("Could not find schema in UDF context");
@@ -131,39 +141,40 @@ public class MongoInsertStorage extends StoreFunc implements StoreMetadata {
 
         try {
             // Parse the schema from the string stored in the properties object.
-            this.schema = new ResourceSchema(Utils.getSchemaFromString(strSchema));
+            schema = new ResourceSchema(Utils.getSchemaFromString(strSchema));
         } catch (Exception e) {
-            this.schema = null;
-            log.warn(e.getMessage());
+            schema = null;
+            LOG.warn(e.getMessage());
         }
 
-        log.info("GOT A SCHEMA "+ this.schema + " " + strSchema);
+        LOG.info("GOT A SCHEMA " + schema + " " + strSchema);
     }
 
-    public OutputFormat getOutputFormat() throws IOException{
-        return this.outputFormat;
-        //final MongoOutputFormat outputFmt = options == null ? new MongoOutputFormat() : new MongoOutputFormat(options.getUpdate().keys, options.getUpdate().multi);
-        //log.info( "OutputFormat... " + outputFmt );
+    public OutputFormat getOutputFormat() throws IOException {
+        return outputFormat;
+        //final MongoOutputFormat outputFmt = options == null ? new MongoOutputFormat() : new MongoOutputFormat(options.getUpdate().keys,
+        // options.getUpdate().multi);
+        //LOG.info( "OutputFormat... " + outputFmt );
         //return outputFmt;
     }
 
-    public String relToAbsPathForStoreLocation( String location, org.apache.hadoop.fs.Path curDir ) throws IOException{
+    public String relToAbsPathForStoreLocation(final String location, final Path curDir) throws IOException {
         // Don't convert anything - override to keep base from messing with URI
         return location;
     }
 
-    public void setStoreLocation( String location, Job job ) throws IOException{
+    public void setStoreLocation(final String location, final Job job) throws IOException {
         final Configuration config = job.getConfiguration();
-        log.info( "Store Location Config: " + config + " For URI: " + location );
-        if ( !location.startsWith( "mongodb://" ) )
-            throw new IllegalArgumentException(
-                    "Invalid URI Format.  URIs must begin with a mongodb:// protocol string." );
-        MongoConfigUtil.setOutputURI( config, location );
+        LOG.info("Store Location Config: " + config + " For URI: " + location);
+        if (!location.startsWith("mongodb://")) {
+            throw new IllegalArgumentException("Invalid URI Format.  URIs must begin with a mongodb:// protocol string.");
+        }
+        MongoConfigUtil.setOutputURI(config, location);
     }
 
 
     @Override
-    public void setStoreFuncUDFContextSignature(String signature) {
+    public void setStoreFuncUDFContextSignature(final String signature) {
         udfcSignature = signature;
     }
 

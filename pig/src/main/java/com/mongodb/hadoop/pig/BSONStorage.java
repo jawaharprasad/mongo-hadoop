@@ -16,6 +16,7 @@
 
 package com.mongodb.hadoop.pig;
 
+<<<<<<< HEAD
 import org.bson.*;
 import org.bson.types.*;
 import org.bson.types.ObjectId;
@@ -29,61 +30,98 @@ import org.apache.hadoop.mapreduce.*;
 import org.apache.pig.*;
 import org.apache.pig.data.*;
 import org.apache.pig.impl.util.*;
+=======
+import com.mongodb.BasicDBObjectBuilder;
+import com.mongodb.hadoop.BSONFileOutputFormat;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.OutputFormat;
+import org.apache.hadoop.mapreduce.RecordWriter;
+import org.apache.pig.LoadFunc;
+>>>>>>> d900ab824fc4bc8581527ecc28f51cd239fb8773
 import org.apache.pig.ResourceSchema;
 import org.apache.pig.ResourceSchema.ResourceFieldSchema;
+import org.apache.pig.ResourceStatistics;
+import org.apache.pig.StoreFunc;
+import org.apache.pig.StoreMetadata;
+import org.apache.pig.data.DataBag;
+import org.apache.pig.data.DataType;
+import org.apache.pig.data.Tuple;
+import org.apache.pig.impl.util.UDFContext;
+import org.apache.pig.impl.util.Utils;
 
+<<<<<<< HEAD
 
 import java.io.*;
 import java.text.ParseException;
 import java.util.*;
 import java.text.SimpleDateFormat;
+=======
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+>>>>>>> d900ab824fc4bc8581527ecc28f51cd239fb8773
 
 public class BSONStorage extends StoreFunc implements StoreMetadata {
-    
-    private static final Log log = LogFactory.getLog( MongoStorage.class );
+
+    private static final Log LOG = LogFactory.getLog(MongoStorage.class);
     static final String SCHEMA_SIGNATURE = "bson.pig.output.schema";
+    //CHECKSTYLE:OFF
     protected ResourceSchema schema = null;
+    //CHECKSTYLE:ON
     private RecordWriter out;
-    
+
     private String udfcSignature = null;
     private String idField = null;
-    private boolean useUpsert = false; 
-    
+
     private final BSONFileOutputFormat outputFormat = new BSONFileOutputFormat();
-    
-    public BSONStorage(){ }
-    
-    public BSONStorage(String idField){ 
+
+    public BSONStorage() {
+    }
+
+    public BSONStorage(final String idField) {
         this.idField = idField;
     }
-    
-    /*
+
+    /**
      * Returns object more suited for BSON storage. Object o corresponds to a field value in pig.
      *
-     * @param object o : object representing pig type to convert to BSON-like object
-     * @param ResourceFieldSchema field : field to place o in
-     * @param String toIgnore : name of field in Object o to ignore
+     * @param o        object representing pig type to convert to BSON-like object
+     * @param field    field to place o in
+     * @param toIgnore name of field in Object o to ignore
      */
-    public static Object getTypeForBSON(Object o, ResourceSchema.ResourceFieldSchema field, String toIgnore) throws IOException{
+    public static Object getTypeForBSON(final Object o, final ResourceFieldSchema field, final String toIgnore)
+        throws IOException {
         byte dataType = field != null ? field.getType() : DataType.UNKNOWN;
         ResourceSchema s = null;
-        if( field == null ){
-            if(o instanceof Map){
+        if (field == null) {
+            if (o instanceof Map) {
                 dataType = DataType.MAP;
-            }else if(o instanceof List){ 
+            } else if (o instanceof List) {
                 dataType = DataType.BAG;
             } else {
                 dataType = DataType.UNKNOWN;
             }
-        }else{
+        } else {
             s = field.getSchema();
-            if(dataType == DataType.UNKNOWN ){
-                if(o instanceof Map) dataType = DataType.MAP;
-                if(o instanceof List) dataType = DataType.BAG;
+            if (dataType == DataType.UNKNOWN) {
+                if (o instanceof Map) {
+                    dataType = DataType.MAP;
+                }
+                if (o instanceof List) {
+                    dataType = DataType.BAG;
+                }
             }
         }
-        
-        if(dataType == DataType.BYTEARRAY && o instanceof Map){
+
+        if (dataType == DataType.BYTEARRAY && o instanceof Map) {
             dataType = DataType.MAP;
         }
 
@@ -117,39 +155,35 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
             //Given a TUPLE, create a Map so BSONEncoder will eat it
             case DataType.TUPLE:
                 if (s == null) {
-                    throw new IOException("Schemas must be fully specified to use "
-                                          + "this storage function.  No schema found for field " +
-                      field.getName());
+                    throw new IOException("Schemas must be fully specified to use this storage function.  No schema found for field "
+                                          + field.getName());
                 }
-                ResourceSchema.ResourceFieldSchema[] fs = s.getFields();
-                LinkedHashMap m = new java.util.LinkedHashMap();
+                ResourceFieldSchema[] fs = s.getFields();
+                Map<String, Object> m = new LinkedHashMap<String, Object>();
                 for (int j = 0; j < fs.length; j++) {
                     m.put(fs[j].getName(), getTypeForBSON(((Tuple) o).get(j), fs[j], toIgnore));
                 }
                 return m;
-                
-                // Given a BAG, create an Array so BSONEnconder will eat it.
+
+            // Given a BAG, create an Array so BSONEncoder will eat it.
             case DataType.BAG:
                 if (s == null) {
-                    throw new IOException("Schemas must be fully specified to use "
-                                          + "this storage function.  No schema found for field " +
-                                          field.getName());
+                    throw new IOException("Schemas must be fully specified to use this storage function.  No schema found for field "
+                                          + field);
                 }
                 fs = s.getFields();
                 if (fs.length != 1 || fs[0].getType() != DataType.TUPLE) {
-                    throw new IOException("Found a bag without a tuple "
-                                          + "inside!");
+                    throw new IOException("Found a bag without a tuple inside!");
                 }
                 // Drill down the next level to the tuple's schema.
                 s = fs[0].getSchema();
                 if (s == null) {
-                    throw new IOException("Schemas must be fully specified to use "
-                                          + "this storage function.  No schema found for field " +
-                                          field.getName());
+                    throw new IOException("Schemas must be fully specified to use this storage function.  No schema found for field "
+                                          + field.getName());
                 }
                 fs = s.getFields();
                 ArrayList<Object> a = new ArrayList<Object>();
-                
+
                 // check if fs[0] should be 'unnamed', in which case, we create an array
                 // of 'inner' elements.
                 // For example, {("a"),("b")} becomes ["a","b"] if
@@ -160,20 +194,23 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
                         a.add(t.get(0));
                     }
                 } else {
-                    for (Tuple t : (DataBag)o) {
-                        LinkedHashMap ma = new java.util.LinkedHashMap();
+                    for (Tuple t : (DataBag) o) {
+                        Map<String, Object> ma = new LinkedHashMap<String, Object>();
                         for (int j = 0; j < fs.length; j++) {
                             ma.put(fs[j].getName(), getTypeForBSON(t.get(j), fs[j], toIgnore));
                         }
                         a.add(ma);
                     }
                 }
-                
+
                 return a;
             case DataType.MAP:
+                if (o == null) {
+                    return null;
+                }
                 Map map = (Map) o;
-                Map<String,Object> out = new HashMap<String,Object>(map.size());
-                for(Object key : map.keySet()) {
+                Map<String, Object> out = new HashMap<String, Object>(map.size());
+                for (Object key : map.keySet()) {
                     out.put(key.toString(), getTypeForBSON(map.get(key), null, toIgnore));
                 }
                 return out;
@@ -181,106 +218,112 @@ public class BSONStorage extends StoreFunc implements StoreMetadata {
                 return o;
         }
     }
-    
-    protected void writeField(BasicDBObjectBuilder builder,
-                              ResourceSchema.ResourceFieldSchema field,
-                              Object d) throws IOException {
+
+    @SuppressWarnings("unchecked")
+    protected void writeField(final BasicDBObjectBuilder builder, final ResourceFieldSchema field, final Object d) throws IOException {
         Object convertedType = getTypeForBSON(d, field, null);
         String fieldName = field != null ? field.getName() : "value";
-        
-        if(convertedType instanceof Map){
-            for( Map.Entry<String, Object> mapentry : ((Map<String,Object>)convertedType).entrySet() ){
-                String addKey = mapentry.getKey().equals(this.idField) ? "_id" : mapentry.getKey();
+
+        if (convertedType instanceof Map) {
+            for (Map.Entry<String, Object> mapentry : ((Map<String, Object>) convertedType).entrySet()) {
+                String addKey = mapentry.getKey().equals(idField) ? "_id" : mapentry.getKey();
                 builder.add(addKey, mapentry.getValue());
             }
-        }else{
-            String addKey =  field!=null && fieldName.equals(this.idField) ? "_id" : fieldName;
+        } else {
             builder.add(fieldName, convertedType);
         }
-        
+
     }
-    
-    public void checkSchema( ResourceSchema schema ) throws IOException{
+
+    @Override
+    public void checkSchema(final ResourceSchema schema) throws IOException {
         this.schema = schema;
-        UDFContext udfc = UDFContext.getUDFContext();
-        
-        Properties p = udfc.getUDFProperties(this.getClass(), new String[]{udfcSignature});
+        UDFContext context = UDFContext.getUDFContext();
+
+        Properties p = context.getUDFProperties(getClass(), new String[]{udfcSignature});
         p.setProperty(SCHEMA_SIGNATURE, schema.toString());
     }
-    
-    public void storeSchema( ResourceSchema schema, String location, Job job ){
+
+    @Override
+    public void storeSchema(final ResourceSchema schema, final String location, final Job job) {
         // not implemented
     }
-    
-    
-    public void storeStatistics( ResourceStatistics stats, String location, Job job ){
+
+
+    @Override
+    public void storeStatistics(final ResourceStatistics stats, final String location, final Job job) {
         // not implemented
     }
-    
-    public void putNext( Tuple tuple ) throws IOException{
-        try{
+
+    @Override
+    public void putNext(final Tuple tuple) throws IOException {
+        try {
             final BasicDBObjectBuilder builder = BasicDBObjectBuilder.start();
             ResourceFieldSchema[] fields = null;
-            if(this.schema != null){
-                fields = this.schema.getFields();
+            if (schema != null) {
+                fields = schema.getFields();
             }
-            if(fields != null){
+            if (fields != null) {
                 for (int i = 0; i < fields.length; i++) {
                     writeField(builder, fields[i], tuple.get(i));
                 }
-            }else{
+            } else {
                 for (int i = 0; i < tuple.size(); i++) {
                     writeField(builder, null, tuple.get(i));
                 }
             }
-            
-            BSONObject bsonformat = builder.get();
-            this.out.write(null, bsonformat);
-        }catch(Exception e){
-            throw new IOException("Couldn't convert tuple to bson: " , e);
+
+            out.write(null, builder.get());
+        } catch (Exception e) {
+            throw new IOException("Couldn't convert tuple to bson: ", e);
         }
     }
-    
-    public void prepareToWrite( RecordWriter writer ) throws IOException{
-        this.out = writer;
-        if ( this.out == null )
-            throw new IOException( "Invalid Record Writer" );
-        
+
+    @Override
+    public void prepareToWrite(final RecordWriter writer) throws IOException {
+        out = writer;
+        if (out == null) {
+            throw new IOException("Invalid Record Writer");
+        }
+
         UDFContext udfc = UDFContext.getUDFContext();
-        Properties p = udfc.getUDFProperties(this.getClass(), new String[]{udfcSignature});
+        Properties p = udfc.getUDFProperties(getClass(), new String[]{udfcSignature});
         String strSchema = p.getProperty(SCHEMA_SIGNATURE);
         if (strSchema == null) {
-            log.warn("Could not find schema in UDF context!");
-            log.warn("Will attempt to write records without schema.");
+            LOG.warn("Could not find schema in UDF context!");
+            LOG.warn("Will attempt to write records without schema.");
         }
-        
+
         try {
             // Parse the schema from the string stored in the properties object.
-            this.schema = new ResourceSchema(Utils.getSchemaFromString(strSchema));
+            schema = new ResourceSchema(Utils.getSchemaFromString(strSchema));
         } catch (Exception e) {
-            this.schema = null;
-            log.warn(e.getMessage());
+            schema = null;
+            LOG.warn(e.getMessage());
         }
-        
+
     }
-    
-    public OutputFormat getOutputFormat() throws IOException{
-        return this.outputFormat;
+
+    @Override
+    public OutputFormat getOutputFormat() throws IOException {
+        return outputFormat;
     }
-    
-    public String relToAbsPathForStoreLocation( String location, org.apache.hadoop.fs.Path curDir ) throws IOException{
+
+    @Override
+    public String relToAbsPathForStoreLocation(final String location, final Path curDir) throws IOException {
         return LoadFunc.getAbsolutePath(location, curDir);
     }
-    
-    public void setStoreLocation( String location, Job job ) throws IOException{
+
+    @Override
+    public void setStoreLocation(final String location, final Job job) throws IOException {
         final Configuration config = job.getConfiguration();
         config.set("mapred.output.file", location);
     }
-    
+
 
     @Override
-    public void setStoreFuncUDFContextSignature(String signature) {
+    public void setStoreFuncUDFContextSignature(final String signature) {
         udfcSignature = signature;
     }
-    
+
 }

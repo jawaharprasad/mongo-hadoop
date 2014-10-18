@@ -17,7 +17,6 @@
 package com.mongodb.hadoop.mapred.input;
 
 import com.mongodb.hadoop.io.BSONWritable;
-import com.mongodb.hadoop.util.BSONLoader;
 import com.mongodb.hadoop.util.MongoConfigUtil;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
@@ -26,29 +25,25 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.mapred.FileSplit;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.RecordReader;
-import org.apache.hadoop.mapred.TaskAttemptContext;
-import org.apache.hadoop.mapred.FileSplit;
-import org.bson.*;
+import org.bson.BSONCallback;
+import org.bson.BSONDecoder;
+import org.bson.BSONObject;
+import org.bson.BasicBSONCallback;
+import org.bson.BasicBSONDecoder;
+import org.bson.LazyBSONCallback;
+import org.bson.LazyBSONDecoder;
 
-import java.io.DataInputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.io.InputStream;
-import java.util.Iterator;
-import java.util.NoSuchElementException;
-import java.util.concurrent.atomic.AtomicBoolean;
+
+import static java.lang.String.format;
 
 public class BSONFileRecordReader implements RecordReader<NullWritable, BSONWritable> {
+    private static final Log LOG = LogFactory.getLog(BSONFileRecordReader.class);
+
     private FileSplit fileSplit;
-    private Configuration conf;
-    private BSONLoader rdr;
-    private static final Log log = LogFactory.getLog(BSONFileRecordReader.class);
-    private Object key;
-    private BSONWritable value;
-    byte[] headerBuf = new byte[4];
     private FSDataInputStream in;
     private int numDocsRead = 0;
     private boolean finished = false;
@@ -56,14 +51,11 @@ public class BSONFileRecordReader implements RecordReader<NullWritable, BSONWrit
     private BSONCallback callback;
     private BSONDecoder decoder;
 
-    public BSONFileRecordReader(){ }
-
-    public void initialize(InputSplit inputSplit, Configuration conf) throws IOException {
-        this.fileSplit = (FileSplit) inputSplit;
-        this.conf = conf;
+    public void initialize(final InputSplit inputSplit, final Configuration conf) throws IOException {
+        fileSplit = (FileSplit) inputSplit;
         Path file = fileSplit.getPath();
         FileSystem fs = file.getFileSystem(conf);
-        in = fs.open(file, 16*1024*1024);
+        in = fs.open(file, 16 * 1024 * 1024);
         in.seek(fileSplit.getStart());
         if (MongoConfigUtil.getLazyBSON(conf)) {
             callback = new LazyBSONCallback();
@@ -75,56 +67,60 @@ public class BSONFileRecordReader implements RecordReader<NullWritable, BSONWrit
     }
 
     @Override
-    public boolean next(NullWritable key, BSONWritable value) throws IOException {
-        try{
-            if(in.getPos() >= this.fileSplit.getStart() + this.fileSplit.getLength()){
-                try{
-                    this.close();
-                }catch(Exception e){
-                }finally{
-                    return false;
+    public boolean next(final NullWritable key, final BSONWritable value) throws IOException {
+        try {
+            if (in.getPos() >= fileSplit.getStart() + fileSplit.getLength()) {
+                try {
+                    close();
+                } catch (final Exception e) {
+                    LOG.warn(e.getMessage(), e);
                 }
+                return false;
             }
 
             callback.reset();
-            int bytesRead = decoder.decode(in, callback);
-            BSONObject bo = (BSONObject)callback.get();
+            decoder.decode(in, callback);
+            BSONObject bo = (BSONObject) callback.get();
             value.setDoc(bo);
 
             numDocsRead++;
-            if(numDocsRead % 5000 == 0){
-                log.debug("read " + numDocsRead + " docs from " + this.fileSplit.toString() + " at " + in.getPos());
+            if (numDocsRead % 5000 == 0) {
+                LOG.debug(String.format("read %d docs from %s at %d", numDocsRead, fileSplit, in.getPos()));
             }
             return true;
-        }catch(Exception e){
-            log.error("Error reading key/value from bson file: " + e.getMessage());
-            try{
-                this.close();
-            }catch(Exception e2){
-            }finally{
-                return false;
+        } catch (final Exception e) {
+            LOG.error(format("Error reading key/value from bson file on line %d: %s", numDocsRead, e.getMessage()));
+            try {
+                close();
+            } catch (final Exception e2) {
+                LOG.warn(e2.getMessage(), e2);
             }
+            return false;
         }
     }
 
     public float getProgress() throws IOException {
-        if(this.finished)
+        if (finished) {
             return 1f;
-        if(in != null)
-            return new Float(in.getPos() - this.fileSplit.getStart()) / this.fileSplit.getLength();
+        }
+        if (in != null) {
+            return (float) (in.getPos() - fileSplit.getStart()) / fileSplit.getLength();
+        }
         return 0f;
     }
 
     public long getPos() throws IOException {
-        if(this.finished)
-            return this.fileSplit.getStart() + this.fileSplit.getLength();
-        if(in != null )
+        if (finished) {
+            return fileSplit.getStart() + fileSplit.getLength();
+        }
+        if (in != null) {
             return in.getPos();
-        return this.fileSplit.getStart();
+        }
+        return fileSplit.getStart();
     }
 
     @Override
-    public NullWritable createKey(){
+    public NullWritable createKey() {
         return NullWritable.get();
     }
 
@@ -135,9 +131,11 @@ public class BSONFileRecordReader implements RecordReader<NullWritable, BSONWrit
 
     @Override
     public void close() throws IOException {
-        log.info("closing bson file split.");
-        this.finished = true;
-        if(this.in != null){
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("closing bson file split.");
+        }
+        finished = true;
+        if (in != null) {
             in.close();
         }
     }
