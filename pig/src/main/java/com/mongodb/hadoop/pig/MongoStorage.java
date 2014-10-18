@@ -148,7 +148,7 @@ public class MongoStorage extends StoreFunc implements StoreMetadata {
             builder.add(fieldName, d.toString());
         } else if (i == DataType.CHARARRAY) {
             builder.add(fieldName, d);
-        } else if (i == DataType.TUPLE) {`
+        } else if (i == DataType.TUPLE) {
             // Given a TUPLE, create a Map so BSONEncoder will eat it
             if (s == null) {
                 throw new IOException("Schemas must be fully specified to use this storage function.  No schema found for field "
